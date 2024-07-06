@@ -1,0 +1,37 @@
+{
+  "name": "choco.js",
+  "description": "Fast & Lightweight JavaScript library for creating modern and secure web applications.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Sammwy",
+  "keywords": [
+    "bun.js",
+    "bun",
+    "javascript",
+    "typescript",
+    "web",
+    "library",
+    "framework"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sammwyy/choco.js.git"
+  },
+  "module": "./src/index.ts",
+  "type": "module",
+  "scripts": {
+    "example:router": "bun run ./examples/child-router.ts",
+    "example:hello": "bun run ./examples/hello-world.ts",
+    "example:middlewares": "bun run ./examples/middlewares.ts",
+    "example:state": "bun run ./examples/state-management.ts",
+    "example:with-cache": "bun run ./examples/with-cache.ts",
+    "example:with-cors": "bun run ./examples/with-cors.ts",
+    "example:with-logger": "bun run ./examples/with-logger.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

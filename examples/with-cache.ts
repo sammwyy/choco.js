@@ -14,6 +14,7 @@ app.withCache({
 });
 
 app.get("/", (_ctx) => {
+  console.log("Generating response...");
   return { hello: "world" };
 });
 

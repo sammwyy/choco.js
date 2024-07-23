@@ -10,6 +10,7 @@ Fast & Lightweight JavaScript library for creating modern and secure web applica
 - **🌐 Comprehensive**: Support for various HTTP methods, robust routing, and middleware handling.
 - **📊 Monitoring**: Built-in support for logging and monitoring.
 - **💼 Flexible**: Easily extendable with custom middleware and supports multiple runtimes.
+- **🐇 Lightweight**: Zero dependencies and only 70kb in size. Just and necessary for your application.
 
 ## Supported Runtimes
 

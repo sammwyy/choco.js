@@ -42,6 +42,7 @@ export interface HTTPResponse {
 export interface Context {
   req: HTTPRequest;
   res: HTTPResponse;
+  params: Record<string, string>;
   timestamp: number;
   app: ChocoServer;
   get<T>(key: string): T | undefined;

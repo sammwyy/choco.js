@@ -1,7 +1,7 @@
 {
   "name": "choco.js",
   "description": "Fast & Lightweight JavaScript library for creating modern and secure web applications.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "author": "Sammwy",
   "keywords": [
@@ -20,6 +20,7 @@
   "module": "./src/index.ts",
   "type": "module",
   "scripts": {
+    "example:advanced": "bun run ./examples/advanced-routes.ts",
     "example:router": "bun run ./examples/child-router.ts",
     "example:hello": "bun run ./examples/hello-world.ts",
     "example:middlewares": "bun run ./examples/middlewares.ts",

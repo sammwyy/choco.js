@@ -1,5 +1,22 @@
+import { HTTPError, NotFoundError } from "./error";
 import type { Context, HTTPMethod, HTTPStatus, ResponseData } from "./http";
-import { Pipeline } from "./pipeline";
+import { Pipeline, type Handler, type Middleware } from "./pipeline";
+import { extractParams, matchPath } from "./utils";
+
+export type HandleResult = {
+  data: unknown;
+  parents: Router[];
+};
+
+const DefaultStatus: { [key in HTTPMethod]: HTTPStatus } = {
+  GET: 200,
+  POST: 201,
+  PUT: 204,
+  PATCH: 204,
+  DELETE: 204,
+  OPTIONS: 204,
+  HEAD: 204,
+};
 
 /**
  * A route handler.
@@ -20,7 +37,7 @@ export type RouteHandler = (
  */
 export type Route = {
   method: HTTPMethod;
-  path: string;
+  path: string | RegExp;
   handle: RouteHandler;
   status?: HTTPStatus;
   headers?: Record<string, string>;
@@ -36,6 +53,7 @@ export class Router {
   private readonly children: Router[];
   private readonly prefix: string;
   public readonly pipeline: Pipeline;
+  public readonly postPipeline: Pipeline;
 
   /**
    *  Creates a new router.
@@ -46,6 +64,7 @@ export class Router {
     this.children = [];
     this.prefix = prefix ?? "";
     this.pipeline = new Pipeline();
+    this.postPipeline = new Pipeline();
   }
 
   /**
@@ -63,24 +82,26 @@ export class Router {
    */
   public add(
     method: HTTPMethod,
-    pathOrSettings: string | (Partial<Route> & { path: string }),
+    pathOrSettings:
+      | string
+      | RegExp
+      | (Partial<Route> & { path: string | RegExp }),
     handler: RouteHandler
   ) {
-    const pathIsStr = typeof pathOrSettings === "string";
-    const route = pathIsStr
+    const pathIsObject =
+      typeof pathOrSettings === "object" && "path" in pathOrSettings;
+    const route: Route = pathIsObject
       ? {
-          method,
-          path: pathOrSettings,
-          handle: handler,
-        }
-      : {
           ...pathOrSettings,
           method,
           handle: handler,
+        }
+      : {
+          method,
+          path: pathOrSettings,
+          handle: handler,
         };
 
-    route.path = (this.prefix + route.path).replace(/\/+/g, "/");
-    if (route.path.endsWith("/")) route.path = route.path.slice(0, -1);
     this.routes.add(route);
     return route;
   }
@@ -93,7 +114,7 @@ export class Router {
    * @example
    * router.get("/test", (ctx) => "Hello, world!");
    */
-  public get(pathOrSettings: string | Route, handler: RouteHandler) {
+  public get(pathOrSettings: string | RegExp | Route, handler: RouteHandler) {
     return this.add("GET", pathOrSettings, handler);
   }
 
@@ -122,7 +143,7 @@ export class Router {
   }
 
   /**
-   * Adds a POST route to the router.
+   * Adds a PATCH route to the router.
    * @param pathOrSettings  - The path of the route, or an object with path and other settings.
    * @param handler  - The handler for the route.
    * @returns The route that was added.
@@ -235,32 +256,160 @@ export class Router {
    * @example
    * const route = router.lookupPath("GET", "/test");
    */
-  public lookupPath(method: string, path: string): Route | undefined {
+  public lookupPath(
+    method: string,
+    path: string,
+    parents?: Router[]
+  ):
+    | { route: Route; params: Record<string, string>; parents: Router[] }
+    | undefined {
+    const parentPrefix = (parents || [])
+      .map((p) => p.prefix)
+      .join("/")
+      .replaceAll("//", "/");
+
+    const fullPrefix = (
+      parentPrefix ? `${parentPrefix}/${this.prefix}` : this.prefix
+    ).replace("//", "/");
+
     for (const route of this.routes) {
-      if (route.method === method && route.path === path) {
-        return route;
+      if (matchPath(fullPrefix, route.path, path) && route.method === method) {
+        const params = extractParams(fullPrefix, route.path, path);
+        return { route, params, parents: parents || [] };
       }
     }
 
     for (const child of this.children) {
-      const route = child.lookupPath(method, path);
-      if (route) {
-        return route;
+      const result = child.lookupPath(
+        method,
+        path,
+        parents ? [...parents, this] : [this]
+      );
+      if (result) {
+        return result;
       }
     }
   }
 
-  protected async _handleRequest(context: Context) {
+  /**
+   * Adds a middleware handler to the server pipeline. The handler will be called BEFORE the route handler.
+   * @param middleware - The middleware or handler to add.
+   * @example
+   * server.use((ctx, next) => {
+   *    console.log("Before route handler");
+   *    return next();
+   * });
+   */
+  use(middleware: Handler | Middleware) {
+    if (typeof middleware === "function") {
+      this.pipeline.addLast(middleware);
+    } else {
+      this.pipeline.addLast(middleware.handler, middleware.name);
+    }
+  }
+
+  /**
+   * Adds a middleware handler to the server post-pipeline. The handler will be called AFTER the route handler.
+   * @param middleware - The middleware or handler to add.
+   * @example
+   * server.usePost((ctx, next) => {
+   *    console.log("After route handler");
+   *    return next();
+   * });
+   */
+  usePost(middleware: Handler | Middleware) {
+    if (typeof middleware === "function") {
+      this.postPipeline.addLast(middleware);
+    } else {
+      this.postPipeline.addLast(middleware.handler, middleware.name);
+    }
+  }
+
+  private async _handle(context: Context): Promise<HandleResult> {
     // Handle pipeline
     const handled = await this.pipeline.handle(context);
+    let parents: Router[] = [];
 
     if (handled) {
-      const route = this.lookupPath(context.req.method, context.req.path);
-      if (route) {
-        return await route.handle(context);
+      const result = this.lookupPath(context.req.method, context.req.path);
+
+      if (result) {
+        const { params, route } = result;
+        parents = result.parents;
+
+        for (const parent of parents) {
+          const parentHandled = await parent.pipeline.handle(context);
+          if (!parentHandled) {
+            return { data: context.res.data, parents };
+          }
+        }
+
+        context.params = params;
+        const response = await route.handle(context);
+
+        if (response) {
+          context.res.data = response;
+        }
+      } else {
+        throw new NotFoundError(
+          `Route not found: ${context.req.method} ${context.req.path}`
+        );
       }
     }
 
-    return undefined;
+    return { data: context.res.data, parents };
+  }
+
+  public async handle(ctx: Context) {
+    return await this._handle(ctx)
+      .catch((error) => {
+        const isHTTPError = error instanceof HTTPError;
+        const isDev = process.env.NODE_ENV !== "production";
+
+        const status = isHTTPError ? error.statusCode : 500;
+        const message = isHTTPError ? error.message : "Internal Server Error";
+
+        ctx.res.status = status;
+        ctx.res.data = {
+          error: message,
+          statusCode: status,
+        };
+
+        if (!isHTTPError) {
+          console.error(error);
+
+          if (isDev) {
+            const data = ctx.res.data as Record<string, unknown>;
+            data._internal = {
+              name: error.name,
+              message: error.message,
+              stack: error.stack.split("\n").map((line: string) => line.trim()),
+            };
+            data._internal_tip =
+              "Set NODE_ENV=production to disable error details.";
+          }
+        }
+
+        return ctx.res.data;
+      })
+      .then(async (result) => {
+        let parents = (result as HandleResult)?.parents;
+        let data = (result as HandleResult)?.data;
+
+        if (ctx.res.status === -1) {
+          ctx.res.status = DefaultStatus[ctx.req.method];
+        }
+
+        if (parents) {
+          for (const parent of parents) {
+            await parent.postPipeline.handle(ctx);
+          }
+        }
+
+        return data;
+      })
+      .finally(async () => {
+        await this.postPipeline.handle(ctx);
+      });
   }
 }

@@ -35,11 +35,12 @@ export class Pipeline {
    * @param context - The context to be handled.
    */
   async handle(context: Context) {
-    let index = 0;
+    let index = -1;
     const next = async () => {
+      index++;
+
       if (index < this.handlers.length) {
         const current = this.handlers[index];
-        index++;
         await current.handler(context, next);
       }
     };

@@ -1,6 +1,6 @@
-import App from "../src";
+import Choco from "../src";
 
-const app = new App({
+const app = new Choco.App({
   port: 8080,
   host: "localhost",
   pathPrefix: "/api",

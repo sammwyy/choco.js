@@ -1,4 +1,4 @@
-import type { ChocoServer } from "./server";
+import type { App } from "./server";
 import type { URLParts } from "./utils";
 
 /**
@@ -44,7 +44,7 @@ export interface Context {
   res: HTTPResponse;
   params: Record<string, string>;
   timestamp: number;
-  app: ChocoServer;
+  app: App;
   get<T>(key: string): T | undefined;
   set<T>(key: string, value: T): void;
 }

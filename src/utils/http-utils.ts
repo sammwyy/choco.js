@@ -1,5 +1,5 @@
 import type { Context, HTTPRequest, HTTPResponse } from "../http";
-import type { ChocoServer } from "../server";
+import type { App } from "../server";
 
 /**
  * Represents the parts of a URL.
@@ -58,7 +58,7 @@ export function responseFactory(): HTTPResponse {
  * @returns A context instance object.
  */
 export function contextFactory(
-  app: ChocoServer,
+  app: App,
   req: HTTPRequest,
   res: HTTPResponse
 ): Context {

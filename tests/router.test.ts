@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 import { Router } from "../src/router";
 import { createMockContext } from "../src/utils";
 
-// Index routing
-test("Index route handling", async () => {
+// Test basic route handling
+test("Basic route handling", async () => {
   const router = new Router();
 
   router.get("/", (ctx) => {
@@ -25,19 +25,6 @@ test("Route not found handling", async () => {
     statusCode: 404,
   });
   expect(ctx.res.status).toBe(404);
-});
-
-// Test basic route handling
-test("Basic route handling", async () => {
-  const router = new Router();
-
-  router.get("/hello", (ctx) => {
-    return { message: "Hello, world!" };
-  });
-
-  const ctx = createMockContext("GET", "/hello");
-  await router.handle(ctx);
-  expect(ctx.res.data).toEqual({ message: "Hello, world!" });
 });
 
 // Test route with parameters
@@ -113,4 +100,25 @@ test("Route with regex", async () => {
   const ctx = createMockContext("GET", "/test/regex");
   await router.handle(ctx);
   expect(ctx.res.data).toEqual({ matched: "regex" });
+});
+
+// Test route with state.
+test("Route with state", async () => {
+  const router = new Router();
+
+  router.get("/counter", (ctx) => {
+    const state = ctx.app.state;
+
+    let visits = state.getOrDefault<number>("visits", 0) + 1;
+    state.set("visits", visits);
+
+    return { visits };
+  });
+
+  const ctx = createMockContext("GET", "/counter");
+
+  for (let i = 0; i < 10; i++) {
+    await router.handle(ctx);
+    expect(ctx.res.data).toEqual({ visits: i + 1 });
+  }
 });

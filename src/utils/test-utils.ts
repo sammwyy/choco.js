@@ -1,5 +1,5 @@
 import type { Context, HTTPMethod } from "../http";
-import type { ChocoServer } from "../server";
+import { App } from "../server";
 import { contextFactory, responseFactory } from "./http-utils";
 
 export const createMockContext = (
@@ -8,7 +8,7 @@ export const createMockContext = (
   body: any = null
 ): Context =>
   contextFactory(
-    {} as unknown as ChocoServer,
+    new App(),
     {
       method,
       path,

@@ -32,7 +32,7 @@ const DefaultSettings: InternalChocoServerSettings = {
   runtime: "bun",
 };
 
-export class ChocoServer extends Router {
+export class App extends Router {
   public readonly settings: InternalChocoServerSettings;
   public readonly state: GenericMap<string>;
 
